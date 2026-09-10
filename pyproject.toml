@@ -1,0 +1,35 @@
+[project]
+name = "marigold-v2-test"
+version = "0.1.0"
+description = "Minimal pipeline to run images through Marigold V2 and inspect the outputs"
+requires-python = ">=3.10"
+dependencies = [
+    "gradio_client>=1.4",
+    "pillow>=10",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+# Only usable on a Linux machine with a CUDA GPU (bitsandbytes 4-bit). ~17 GB VRAM at 1024^2.
+local = [
+    "torch>=2.4",
+    "torchvision",
+    "diffusers>=0.36",
+    "transformers>=4.51",
+    "accelerate",
+    "bitsandbytes>=0.45",
+    "peft>=0.15",
+    "safetensors",
+    "matplotlib",
+    "huggingface_hub",
+]
+
+[project.scripts]
+marigold-test = "marigold_test.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["marigold_test"]
