@@ -34,7 +34,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--input", "-i", required=True, help="Image file or folder of images")
     parser.add_argument("--output", "-o", default="outputs/latest", help="Output folder")
-    parser.add_argument("--backend", choices=["remote", "local"], default="remote")
+    parser.add_argument("--backend", choices=["remote", "local", "mps"], default="remote")
+    parser.add_argument("--max-side", type=int, help="mps backend: cap the long side (default 1536)")
     parser.add_argument(
         "--modality",
         choices=["all", *MODALITIES],
@@ -58,10 +59,14 @@ def main() -> None:
         from .remote import RemoteMarigoldV2
 
         model = RemoteMarigoldV2()
-    else:
+    elif args.backend == "local":
         from .local import LocalMarigoldV2
 
         model = LocalMarigoldV2()
+    else:
+        from .mps import MpsMarigoldV2
+
+        model = MpsMarigoldV2(max_side=args.max_side)
 
     print(f"{len(images)} image(s) -> {out_dir} via {args.backend} backend")
     rows = []

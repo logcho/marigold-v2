@@ -24,6 +24,19 @@ local = [
     "huggingface_hub",
 ]
 
+# Apple Silicon: streams the bf16 transformer from disk (no bitsandbytes needed).
+mps = [
+    "torch>=2.5",
+    "torchvision",
+    "diffusers>=0.36",
+    "transformers>=4.51",
+    "accelerate",
+    "peft>=0.15",
+    "safetensors",
+    "matplotlib",
+    "huggingface_hub[hf_xet]",
+]
+
 [project.scripts]
 marigold-test = "marigold_test.cli:main"
 

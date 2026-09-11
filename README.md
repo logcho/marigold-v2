@@ -34,10 +34,38 @@ succeeded and how long each call took. `index.html` shows everything in a grid.
 |---|---|---|---|
 | `remote` (default) | Authors' demo Space on HF ZeroGPU | internet | ~20-30 s per image, all 4 outputs |
 | `local` | Your CUDA GPU | Linux, ~17 GB VRAM, `uv pip install -e '.[local]'` | first load downloads ~45 GB and quantizes for a few minutes, then a few seconds per image |
+| `mps` | Apple Silicon GPU | macOS, `uv pip install -e '.[mps]'`, ~48 GB disk for weights | ~2 min per image for all 4 outputs at 1536 px on an M3 Max (36 GB); see below |
 
-The remote backend is the one that works on a Mac. Apple Silicon cannot run the
-local backend: the 20B transformer is loaded 4-bit through bitsandbytes, which is
-CUDA-only, and the unquantized bf16 weights alone are ~40 GB.
+The `local` backend cannot run on Apple Silicon: it loads the 20B transformer
+4-bit through bitsandbytes, which is CUDA-only. The `mps` backend exists for that
+case.
+
+### The `mps` backend (disk streaming)
+
+Marigold V2 is a single-step model: one transformer pass per modality. So instead
+of holding the ~40 GB bf16 transformer in memory, `marigold_test/mps.py` builds it
+with every block weight as an empty placeholder and installs forward hooks that
+load each of the 60 blocks right before it runs and free it right after. A
+background thread reads block i+1 into a pinned staging buffer while the GPU
+computes block i. Reads bypass the page cache (a 40 GB scan cannot fit in it and
+would only evict everything else), and the LoRA checkpoint for each modality is
+read from disk when needed rather than held in RAM. Peak process memory is under
+10 GB, and swap stays flat.
+
+```bash
+uv pip install -e '.[mps]'
+hf download Qwen/Qwen-Image-Edit-2509 --include "transformer/*" --include "vae/*" --include "model_index.json"
+hf download huawei-bayerlab/marigold-v2-0 --include "depth/Log-stage2/*" --include "depth/Log-layered/*" \
+    --include "normals/*" --include "albedo/*" --include "qwen_text_embeddings/*512_*"
+marigold-test --input inputs --output outputs/mps --backend mps            # native res, long side capped at 1536
+marigold-test --input inputs --output outputs/mps768 --backend mps --max-side 768   # faster smoke test
+```
+
+Measured on an M3 Max with 36 GB at 1536x1024: about 28 s per modality, of which
+roughly 16 s is GPU compute and the rest is the 40 GB read (the SSD does it in
+~9 s, overlapped with compute). At `--max-side 768` a modality takes about 9 s.
+Numerics are the bf16 base weights rather than the demo's 4-bit base, so outputs
+are close to the demo but not identical.
 
 ZeroGPU quota is the real limit of the remote backend. Every call reserves up to
 180 s of GPU time, and an anonymous IP gets only a few minutes per day, so expect
